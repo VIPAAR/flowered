@@ -66,13 +66,6 @@ init([]) ->
                     restart => permanent,
                     type => worker,
                     module => [ered_compute_engine]
-                },
-                #{
-                    id => ered_ch8_red_web,
-                    start => {ered_webserver, start, []},
-                    restart => permanent,
-                    type => worker,
-                    module => [ered_webserver]
                 }
             ]
         }}.
