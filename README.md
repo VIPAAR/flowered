@@ -112,9 +112,11 @@ Acknowledgement
 License
 ---
 
-
 `DONT'T DO EVIL`
 
 Also be aware that this project partly uses the *Don't do Evil*
 un-enforceable license. The point of the license is not to be
 enforceable but to make the reader think about what is evil. 
+
+* (c) 2025 Gerrit Riessen - https://github.com/gorenje
+* (c) 2025 Help Lightning - https://helplightning.com
