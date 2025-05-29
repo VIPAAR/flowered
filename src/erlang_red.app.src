@@ -1,11 +1,16 @@
 {application, erlang_red, [
-    {description, "an web app to demonstrate Node-RED with Erlang backend"},
+    {description, "A library that can run Node-RED flows"},
     {vsn, "0.1.0"},
     {registered, [erlang_red_sup]},
     {applications, [
         kernel,
         stdlib,
-        cowboy
+        cowboy,
+        mapz,
+        erlang_red_jsonata,
+        erlydtl,
+        bbmustache,
+        emqtt
     ]},
     {env, []},
     {mod, {erlang_red, []}},
