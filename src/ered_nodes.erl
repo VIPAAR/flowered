@@ -426,11 +426,8 @@ node_type_to_module(<<"complete">>)      -> ered_node_complete;
 node_type_to_module(<<"group">>)         -> ered_node_ignore;
 node_type_to_module(<<"status">>)        -> ered_node_status;
 node_type_to_module(<<"trigger">>)       -> ered_node_trigger;
-node_type_to_module(<<"http in">>)       -> ered_node_http_in;
 node_type_to_module(<<"http response">>) -> ered_node_http_response;
 node_type_to_module(<<"http request">>)  -> ered_node_http_request;
-node_type_to_module(<<"mqtt in">>)       -> ered_node_mqtt_in;
-node_type_to_module(<<"mqtt out">>)      -> ered_node_mqtt_out;
 node_type_to_module(<<"exec">>)          -> ered_node_exec;
 node_type_to_module(<<"function">>)      -> ered_node_function;
 node_type_to_module(<<"markdown">>)      -> ered_node_markdown;
@@ -474,10 +471,8 @@ trigger_outgoing_messages(_, _, _) ->
 %% List of all known config nodes that need to be stored away before
 %% a flow is executed
 %% erlfmt:ignore alignment
-is_config_node(<<"mqtt-broker">>)        -> true;
 is_config_node(<<"FlowCompareCfg">>)     -> true;
 is_config_node(<<"FlowHubCfg">>)         -> true;
-is_config_node(<<"websocket-listener">>) -> true;
 is_config_node(_)                        -> false.
 
 %%
