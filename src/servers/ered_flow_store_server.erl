@@ -112,7 +112,7 @@ handle_info({store_flow, FlowId, JsonText}, FlowStore) ->
 
     DestFileName = io_lib:format(
         "~s/testflows/~s/flows.json",
-        [code:priv_dir(erlang_red), FlowId]
+        [code:priv_dir(flowered), FlowId]
     ),
 
     filelib:ensure_dir(DestFileName),
@@ -169,7 +169,7 @@ tab_name_or_filename([NodeDef | MoreNodeDefs], FileName) ->
 compile_file_list() ->
     {ok, MP} = re:compile("([A-Z0-9]{16})/flows.json", [caseless]),
 
-    TestFlowDir = io_lib:format("~s/testflows/", [code:priv_dir(erlang_red)]),
+    TestFlowDir = io_lib:format("~s/testflows/", [code:priv_dir(flowered)]),
 
     FileNames = filelib:fold_files(
         TestFlowDir,

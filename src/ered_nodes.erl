@@ -61,7 +61,7 @@ post_exception_or_debug(NodeDef, Msg, ErrMsg) ->
 unpriv(FileName) when is_binary(FileName) ->
     unpriv(binary_to_list(FileName));
 unpriv(FileName) when is_list(FileName) ->
-    string:replace(FileName, "${priv}", code:priv_dir(erlang_red), all);
+    string:replace(FileName, "${priv}", code:priv_dir(flowered), all);
 unpriv(FileName) ->
     %% Let it fail.
     FileName.

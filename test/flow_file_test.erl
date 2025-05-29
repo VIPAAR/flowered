@@ -203,7 +203,7 @@ foreach_testflow_test_() ->
     ered_csv_parser_store:start(),
 
     {_Cnt, FileNames} = filelib:fold_files(
-        io_lib:format("~s/testflows", [code:priv_dir(erlang_red)]),
+        io_lib:format("~s/testflows", [code:priv_dir(flowered)]),
         "flows.json",
         true,
         fun(Fname, Acc) ->

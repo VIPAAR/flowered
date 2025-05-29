@@ -1,4 +1,4 @@
-{application, erlang_red, [
+{application, flowered, [
     {description, "A library that can run Node-RED flows"},
     {vsn, "0.1.0"},
     {registered, [erlang_red_sup]},
@@ -12,7 +12,7 @@
         bbmustache
     ]},
     {env, []},
-    {mod, {erlang_red, []}},
+    {mod, {flowered, []}},
     {modules, [
         pg,
         ered_webserver,

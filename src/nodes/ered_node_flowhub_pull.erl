@@ -57,7 +57,7 @@ handle_msg({incoming, Msg}, NodeDef) ->
         _ ->
             FileName = io_lib:format(
                 "~s/testflows/~s/flows.json",
-                [code:priv_dir(erlang_red), FlowId]
+                [code:priv_dir(flowered), FlowId]
             ),
             case file:read_file(FileName) of
                 {ok, FileData} ->
