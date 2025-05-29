@@ -9,8 +9,7 @@
         mapz,
         erlang_red_jsonata,
         erlydtl,
-        bbmustache,
-        emqtt
+        bbmustache
     ]},
     {env, []},
     {mod, {erlang_red, []}},
