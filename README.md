@@ -1,40 +1,15 @@
-Erlang-RED - A Node-RED backend coded in Erlang
+Flowered - A Node-RED backend coded in Erlang
 =====
 
-An experiment to replace Node-REDs existing NodeJS backend with an Erlang equivalent that is 100% compatible[1] to existing flow code.
+This is a fork of [Erlang-Red](https://github.com/gorenje/erlang-red)
+to convert it into a simple erlang library for just running flows.
 
-The goal is bring the advantages of low-code visual [flow-based programming](https://jpaulm.github.io/fbp/index.html) to a programming language that is designed for message passing and concurrency from the ground up, hence Erlang.
+This fork removes all the UI and Web Servers (which means you can't
+use Http In or other servers).
 
-[1] = 100% won't be possible since function nodes that are coded in Javascript aren't supported (or aren't intended to be supported - unless someone has a workaround)
+It is expected that you'll already have a framework to handle incoming
+request, and can kick off pre-existing flows manually.
 
-Why?
----
-
-[Node-RED](https://nodered.org) is a amazing[*] tool for creating flows that describe concurrent processing, it is just a shame the NodeJS is single threaded. So why not use something that is multi-process from the ground up? Concurrency is guaranteed and included.
-
-Also Erlang isn't the most understandable of programming language - unless one has fallen into in a [cauldron](https://en.wikipedia.org/wiki/Obelix) of Prolog, spiced with Lisp.
-
-So won't it be great to have the simplicity of low-code visual flow based programming and the performance (and concurrency) of Erlang?
-
-[*] = amazing in the sense of *extendability* (Nodes can easily be added and developed by third parties), *understandability* (Node-RED [terminology](https://blog.openmindmap.org/blog/pipes-wires-nodes) is straightforward) and *usability* (once a rectangle becomes a unit of computation and a line becomes a pathway for data flow)
-
-Development Strategy
----
-
-My development process is best described as [flow driven development](DevelopmentStrategy.md) based around a set of [test flows](priv/testflows) to ensure that node functionality is implemented correctly - meaning that it matches the existing Node-RED functionality.
-
-Test flows are mirrored in a separate [repository](https://github.com/gorenje/erlang-red-flow-testsuite) for better maintainability and also integration with existing Node-RED installations.
-
-Architecture
-----
-
-The architecture, along with a background to Flow Based Programming and Node-RED has been [written](Architecture.md).
-
-The codebase as it stands, has many interdependence because of testing flows: [assert nodes](https://github.com/gorenje/erlang-red/blob/e2bd2f324ddc1bbe611dff29216246b80151ffc0/src/nodes/ered_node_assert_status.erl#L109-L131) need to know about [web-socket communication](https://github.com/gorenje/erlang-red/blob/e2bd2f324ddc1bbe611dff29216246b80151ffc0/src/servers/ered_ws_event_exchange.erl), or because of the nature of nodes: the [complete](https://github.com/gorenje/erlang-red/blob/e2bd2f324ddc1bbe611dff29216246b80151ffc0/src/nodes/ered_node_complete.erl#L74-L89) node needs to know of [completed messages](https://github.com/gorenje/erlang-red/blob/e2bd2f324ddc1bbe611dff29216246b80151ffc0/src/exchanges/ered_message_exchange.erl#L36-L39).
-
-While the [exception node](https://github.com/gorenje/erlang-red/blob/e2bd2f324ddc1bbe611dff29216246b80151ffc0/src/nodes/ered_node_catch.erl#L40) needs to know about exceptions when they [happen](https://github.com/gorenje/erlang-red/blob/e2bd2f324ddc1bbe611dff29216246b80151ffc0/src/exchanges/ered_message_exchange.erl#L46-L56).
-
-An architectural diagram of this interconnectedness would be probably be just as confusing as the code itself.
 
 Supported Nodes & Features
 ---
@@ -103,175 +78,43 @@ Development
 
     $ rebar3 shell --apps erlang_red
 
-Open the Node-RED visual flow editor in a browser:
-
-    $ open -a Firefox http://localhost:9090/node-red
-
-Docker
----
-
-I use docker to develop this so for me, the following works:
-
-    prompt$ git clone git@github.com:gorenje/erlang-red.git
-    prompt$ cd erlang-red
-    prompt$ docker run -it -v $(pwd)/erlang-red:/code -p 9090:8080 -w /code --rm erlang bash
-    docker> rebar3 shell --apps erlang_red
-
-Then from the docker host machine, open a browser:
-
-    prompt$ open -a Firefox http://localhost:9090/node-red
-
-That should display the Node-RED visual editor.
-
-Release
----
-
-A [release](https://github.com/gorenje/erlang-red/blob/3cf3b6a33b59a808ffc865b008c8ee47a4437412/rebar.config#L35-L60) can be bundled together:
-
-    $ rebar3 as prod release -n erlang_red
-
-All static frontend code (for the Node-RED flow editor) and the test flow files in `priv/testflows` are bundled into the release.
-
-Cowboy server will started on port 8080 unless the `PORT` env variable is set.
-
-Fly.io Deployment
----
-
-A sample Dockerfile `Dockerfile.fly` is provided to allow for easy launching of an instance as a fly application.
-The provided shell script (`fly_er.sh`) sets some common expected parameters for the launch.
-Advanced users may wish to examine the `fly launch` line therein and adjust for their requirements.
-
-Heroku Deployment
----
-
-Using the container stack at heroku, deployment becomes a `git push heroku` after the usual heroku setup:
-
-- `heroku login` --> `heroku git:remote -a <app name>` --> `heroku stack:set container` --> `git push heroku`
-
-However the [Dockerfile.heroku](Dockerfile.heroku) does not start the flow editor, the image is designed to run a set of flows, in this case (at time of writing) a simple website with a single page.
-
-Basically this [flow](https://github.com/gorenje/erlang-red/blob/main/priv/testflows/flow.499288ab4007ac6a.json) is the [red-erik.org](https://red-erik.org) site.
-
-The image does this by setting the following ENV variables:
-
-- `COMPUTEFLOW`=`499288ab4007ac6a` - flow to be used. This can also be a comma separated list of flows that are all started.
-- `DISABLE_FLOWEDITOR`=`YES` - any value will do, if set the flow editor is disabled.
-
-Also be aware that Erlang-RED supports a `PORT` env variable to specifying the port upon which Cowboy will listen on for connections. The default is 8080.
-
-Heroku uses this to specify the port to connect for a docker image so that its load balancer can get it right.
-
-
-Example
----
-
-![img](.images/erlang-red.gif)
-
-What the gif shows is executing a [simple flow](https://flowhub.org/f/ea246f68766c8630) using Erlang as a backend. The flow demonstrates the difference in the switch node of 'check all' or 'stop at first match'.
-
-All nodes are are processes- that is shown on the left in the terminal window.
-
-This example is extremely trivial but it does lay the groundwork for expansion.
-
-Testing
----
-
-To create unit tests for this, Node-RED frontend has been extended with a
-"Create Test Case" button on the export dialog:
-
-![img](.images/create-test-case.png)
-
-Test flows are stored in the [testflows](priv/testflows) directory and will be picked up the next time `make eunit-test` is called. In this way it is possible to create unit tests visually.
-
-Flow tests can also be tested within the flow editor, for more details see below.
-
-The flow test suite is now maintained in a [separate](https://github.com/gorenje/erlang-red-flow-testsuite) repository but is duplicated here.
-
-Assert Nodes
----
-
-To better support testing of flows, two new nodes have been created:
-
-![img](.images/assert-nodes.png)
-
-"Assert Failed" node cases unit tests to fail if a message reaches it, regardless of any message values. It's basically the same as a `assert(false)` call. The intention is to ensure that specific parts of a flow aren't reached.
-
-The second node (in green) is an equivalent to a change node except it contains test on attributes of the message object. Possible tests include 'equal', 'match', 'unset' and the respective inverses. Here the intention is that a message passes through is tested for specific values else the unit test fails.
-
-These nodes are necessary since there is no other way to test whether flow is working or not.
-
-Also remember these flow tests are designed to ensure the Erlang backend is correctly implementing node functionality. The purpose of these nodes is *not* to ensure that a flow is correct, rather that the *functionality* of implemented nodes works and continues to work correctly.
-
-Visual Unit Testing
----
-
-My plan is to create test flows that represent specific NodeRED functionality that needs to be implemented by Erlang-RED. This provides regression testing and todos for the implementation.
-
-I created a keyboard shortcut for creating and storing these test flows from the flow editor directly. However I was still use the terminal to execute tests `make eunit-test` - which  became painful. So instead I pulled this testing into Node-RED, as the gif demonstrates:
-
-![img](.images/unit-testing-inside-nodered.gif)
-
-What the gif shows is my list of unit tests, which at the press of a button, can all be tested. Notifications for each test shows the result. In addition, the tree list shows which tests failed/succeed (red 'x' or green check). Also tests can be executed individually so that failures can be checked individually.
-
-The best bit though is that all errors are pushed to the debug panel and from there I get directly to the node causing the error. Visual unit testing is completely integrated into Erlang-RED.
-
-My intention is to create many small flows that represent functionality that needs to be implemented by Erlang-RED. These unit tests shows the compatibility to Node-RED and less the correctness of the Erlang code.
-
-Contributing
----
-
-Contributions very much welcome in the form of Erlang code or as Node-RED test-flows, ideally with the Erlang implementation. Elixir code is also welcome, only it has its own [home](https://github.com/gorenje/erlang-red-elixir-helpers).
-
-Each test flow should test exactly one feature and use the assert nodes to check correctness of expected results. Tests can also be pending to indicate that the corresponding Erlang functionality is still missing.
-
 
 Sibling Repos
 ---
 
 An overview of the sibling projects for both the reader and me:
 
-- [Unit test flow suite](https://github.com/gorenje/erlang-red-flow-testsuite) provides *visual* unit tests that verify the functionality being implemented here is the same as in Node-RED. Those test flows are designed to be executed in both Node-RED and Erlang-RED. [FlowHub.org](https://flowhub.org) maintains the repository and is used to synchronise flow tests between Erlang-RED and Node-RED. These tests can also be used for other projects that aim to replicate Node-RED functionality in an alternative programming language.
+- [Erlang-Red](https://github.com/gorenje/erlang-red) is the original
+  project this was forked from. We may rebase upon erlang-red every
+  once in a while.
 
-- [Node-RED and Erlang-RED unit testing nodes](https://github.com/gorenje/erlang-red-unittesting-nodes) are used to define and automatically ensure the correct functionality. These nodes are embedded in test flows and ensure that test flows are correct. This makes testing repeatable and reliable and fast! As an aside, these nodes are maintained in an [Node-RED flow](https://flowhub.org/f/ef91cb280e1bfd72).
+- [JSONata support for
+  Erlang-RED](https://github.com/gorenje/erlang-red-jsonata) is
+  implemented by an Erlang parser with a grammer that covers most of
+  JSONata syntax, no guarantees made. Support of JSONata functionality
+  is limited to what the test flows require. Nothing prevents others
+  from extending the functionality themselves, it is not a priority of
+  mine.
 
-- [JSONata support for Erlang-RED](https://github.com/gorenje/erlang-red-jsonata) is implemented by an Erlang parser with a grammer that covers most of JSONata syntax, no guarantees made. Support of JSONata functionality is limited to what the test flows require. Nothing prevents others from extending the functionality themselves, it is not a priority of mine.
+- [Elixir helper
+  library](https://github.com/gorenje/erlang-red-elixir-helpers)
+  allows Elixir code to be also part of Erlang-RED. Erlang-RED is not
+  intended to be a *pure* Erlang project, it is intended to be a
+  *pure* BEAM project. Anything that compiles down to the BEAM VM, why
+  not include it?
 
-- [Elixir helper library](https://github.com/gorenje/erlang-red-elixir-helpers) allows Elixir code to be also part of Erlang-RED. Erlang-RED is not intended to be a *pure* Erlang project, it is intended to be a *pure* BEAM project. Anything that compiles down to the BEAM VM, why not include it?
-
-FAQs
----
-
-Questions and Answers at either the [Erlang Forum](https://erlangforums.com/t/erlang-red-erlang-interpreter-for-node-red-flow-code-visual-flow-based-programming/4678) or the [Node-RED Forum](https://discourse.nodered.org/t/erlang-red-erlang-backed-node-red/96458).
-
-Also for more details, there was also a discussion on [Hacker News](https://news.ycombinator.com/item?id=44006231).
-
-Branch Technology
----
-
-To branch or not to branch, that isn't really a question. I'm currently working directly on `main` but ensure that all tests succeed before pushing, so `main` branch will always work. Locally I work with branches but have no desire to make those branches public since I'm working on my own.
-
-Versioning is completely random and has little or no meaning at the moment. I prefer to use [Milestones](MILESTONES.md) since these are arrived at and are not planned, I don't know when the next milestone will be reached.
-
-If this project becomes more collaborative or a "production ready piece of software", more certainty will be applied to the development process, i.e., semantic version numbers will introduced.
-
-I'm more than happy to deal with conflicts if someone developed something on a branch and it doesn't merge - I understand that multiple direct pushes to `main` everyday isn't the done thing but I don't like to have code lying around for weeks on end, not being merged because it's not on a release schedule.
-
-Coding is a creative process, creativity cannot be planned. Imagine Van Gogh working according to a release plan.
 
 Acknowledgement
 ---
 
-[Nick](https://github.com/knolleary) and [Dave](https://github.com/dceejay) for bring Node-RED to live - amazing quality and flexibility and the entire [Node-RED community](https://discourse.nodered.org/).
+[Gorenje](https://github.com/gorenje) for the original implementation.
 
-Much thanks to
-
-- [@mwmiller](https://github.com/mwmiller) for providing a fly server for running a [live version](https://ered.fly.dev/node-red) of Erlang-RED,
-- [@joaohf](https://erlangforums.com/u/joaohf/summary) many tips on coding Erlang and structuring an Erlang project, and
-- [@Maria-12648430](https://erlangforums.com/u/maria-12648430/summary) for debugging my initial attempt to create a gen_server for nodes.
-
-Disclaimer
+License
 ---
 
-No Artificial Intelligence was harmed in the creation of this codebase. This codebase is old skool search engine (ddg), stackoverflow, blog posts and RTFM technology.
 
-Also be aware that this project partly uses the *Don't do Evil* un-enforceable license. The point of the license is not to be enforceable but to make the reader think about what is evil. After all, Pope Leo (the new one) did say ["evil will not prevail"](https://eu.usatoday.com/story/news/world/2025/05/08/pope-leo-xiv-first-speech-message-text/83519162007/) - what does that *even* mean?
+`DONT'T DO EVIL`
+
+Also be aware that this project partly uses the *Don't do Evil*
+un-enforceable license. The point of the license is not to be
+enforceable but to make the reader think about what is evil. 
