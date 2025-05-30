@@ -84,9 +84,9 @@ Usage
 
 Add the following to your `mix.exs`:
 
-```
-     {:erlang_red_helpers, git: "https://github.com/gorenje/erlang-red-elixir-helpers", tag: "0.1.3", override: true},
-     {:flowered, git: "https://github.com/VIPAAR/flowered", tag: "1.0.0"}
+```elixir
+{:erlang_red_helpers, git: "https://github.com/gorenje/erlang-red-elixir-helpers", tag: "0.1.3", override: true},
+{:flowered, git: "https://github.com/VIPAAR/flowered", tag: "1.0.0"}
 ```
 
 To run a flow:
@@ -120,7 +120,7 @@ injector_id = "get-this-from-your-flow"
 # We will generate a map, and put this under the `:req` key
 # 
 # Note: it is important to use `charlist` for keys, or any templates
-#  that mustache will not work!
+#  that use mustache will not work!
 request_object = (%{
       String.to_charlist("body") => body,
       String.to_charlist("params") => strings_to_lists(path_params),
@@ -132,6 +132,8 @@ msg = Map.put(msg, :req, request_object)
 # Put our pid into the msg as `reqpid`. This is critical
 #  as the output is going to be sent back to registered
 #  process
+#
+# This is REQUIRED
 msg = Map.put(msg, :reqpid, self())
 
 # Start the flow
