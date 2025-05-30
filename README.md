@@ -79,6 +79,76 @@ Development
     $ rebar3 shell --apps erlang_red
 
 
+Usage
+----
+
+Add the following to your `mix.exs`:
+
+```
+     {:erlang_red_helpers, git: "https://github.com/gorenje/erlang-red-elixir-helpers", tag: "0.1.3", override: true},
+     {:flowered, git: "https://github.com/VIPAAR/flowered", tag: "1.0.0"}
+```
+
+To run a flow:
+
+```elixir
+# Have a flow as a string of json.
+# It is recommended to use an `inject` node
+#  as your starting point
+flow = "..."
+
+# Generate a unique name
+ws_name = Node.self()
+
+# Start up the nodes in the flow (if they aren't started)
+:ered_compute_engine.deploy(flow, ws_name)
+
+# Use the `inject` node id from our flow
+#  to kick everything off
+injector_id = "get-this-from-your-flow"
+{:ok, injector_pid} = :ered_nodes.nodeid_to_pid(wsname, injector_id)
+
+# Create an outgoing message
+{:outgoing, msg} = :ered_msg_handling.create_outgoing_message(ws_name)
+
+# You can inject any parameters you want into this message
+#  Common parameters are the body, params, cookies, and query,
+#  especially if this is originating from a web request.
+#
+# This is OPTIONAL
+#
+# We will generate a map, and put this under the `:req` key
+# 
+# Note: it is important to use `charlist` for keys, or any templates
+#  that mustache will not work!
+request_object = (%{
+      String.to_charlist("body") => body,
+      String.to_charlist("params") => strings_to_lists(path_params),
+      String.to_charlist("cookies") => [],
+      String.to_charlist("query") => strings_to_lists(query_params),
+})
+msg = Map.put(msg, :req, request_object)
+
+# Put our pid into the msg as `reqpid`. This is critical
+#  as the output is going to be sent back to registered
+#  process
+msg = Map.put(msg, :reqpid, self())
+
+# Start the flow
+GenServer.cast(injector_pid, {:outgoing, msg})
+
+# Listen for a response. Depending on
+#  our final node, you might get different messages.
+# In this case, our final node is a Http Response.
+receive do
+  {:reply, status, headers, ^ws_name, body} ->
+    {:ok, status, headers, body}
+  after 10_000 ->
+    # timeout with an error after 10 seconds
+    {:error, :timeout}
+end
+```
+
 Sibling Repos
 ---
 
