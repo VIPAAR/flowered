@@ -20,3 +20,5 @@ rebar3.crashdump
 *~
 .local_testing
 fly.toml
+
+.envrc
