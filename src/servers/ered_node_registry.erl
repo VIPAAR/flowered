@@ -21,7 +21,7 @@ init([]) ->
     {ok, #{}}.
 
 handle_call({register_node, Name, Mod}, _From, State) ->
-    UpdatedState = maps:put(State, Name, Mod),
+    UpdatedState = maps:put(Name, Mod, State),
     {reply, ok, UpdatedState};
 
 handle_call({node_type_to_module, Name}, _From, State) ->
