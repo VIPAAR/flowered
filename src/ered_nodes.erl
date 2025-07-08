@@ -445,13 +445,17 @@ node_type_to_module(<<"ut-assert-failure">>) -> ered_node_assert_failure;
 node_type_to_module(<<"ut-assert-success">>) -> ered_node_assert_success;
 node_type_to_module(<<"ut-assert-status">>)  -> ered_node_assert_status;
 node_type_to_module(<<"ut-assert-debug">>)   -> ered_node_assert_debug;
-node_type_to_module(Unknown) ->
-    case is_config_node(Unknown) of
-        false ->
-            io:format("noop node initiated for unknown type: ~p\n", [Unknown]),
-            ered_node_noop;
-        _ ->
-            ered_node_ignore
+node_type_to_module(Name) ->
+    case ered_node_registry:node_type_to_module(Name) of
+        {ok, Module} -> Module;
+        error ->
+            case is_config_node(Name) of
+                false ->
+                    io:format("noop node initiated for unknown type: ~p\n", [Name]),
+                    ered_node_noop;
+                _ ->
+                    ered_node_ignore
+            end
     end.
 
 %% A list of all nodes that support outgoing messages, this was originally
