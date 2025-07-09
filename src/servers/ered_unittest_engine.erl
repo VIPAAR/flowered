@@ -15,10 +15,14 @@
 %%
 
 %%
-%% These aren't export to be used external, these are "internal" exports.
--export([not_happen_loop/2]).
--export([run_test_on_another_planet/3]).
+%% These aren't exported to be used external, these are "internal" exports.
+-export([
+    not_happen_loop/2,
+    run_test_on_another_planet/3
+]).
 
+%%
+%%
 -import(ered_flows, [
     compute_timeout/1,
     is_test_case_pending/1,
@@ -26,9 +30,11 @@
     should_keep_flow_running/1
 ]).
 -import(ered_nodes, [
-    create_pid_for_node/2,
     tabid_to_error_collector/1,
     trigger_outgoing_messages/3
+]).
+-import(ered_startup, [
+    create_pids_for_nodes/2
 ]).
 -import(ered_nodered_comm, [
     debug/3,
@@ -40,24 +46,34 @@
     clear_exception_group/2
 ]).
 
+%%
+%%
 start() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+%%
+%%
 init([]) ->
     {ok, #{}}.
 
 handle_call(_Msg, _From, State) ->
     {reply, State, State}.
 
+%%
+%%
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Msg, Store) ->
     {noreply, Store}.
 
+%%
+%%
 stop_all_pids([], _) ->
     ok;
+stop_all_pids([Pid | Pids], WsName) when Pid =:= false ->
+    stop_all_pids(Pids, WsName);
 stop_all_pids([Pid | Pids], WsName) ->
-    is_process_alive(Pid) =/= false andalso Pid ! {stop, WsName},
+    (is_process_alive(Pid) =/= false) andalso (Pid ! {stop, WsName}),
     stop_all_pids(Pids, WsName).
 
 not_happen_loop(TestName, ErrorStorePid) ->
@@ -73,7 +89,7 @@ not_happen_loop(TestName, ErrorStorePid) ->
     end.
 
 ensure_error_store_is_started(TabErrColl, TestName) ->
-    case ered_error_store:start() of
+    case ered_error_store:start_link() of
         {error, {already_started, ErrorStorePid}} ->
             Pid = spawn(?MODULE, not_happen_loop, [TestName, ErrorStorePid]),
             register(TabErrColl, Pid),
@@ -173,7 +189,7 @@ run_test_on_another_planet(FlowId, WsName, true) ->
 run_the_test(FlowId, WsName, Ary) ->
     case should_keep_flow_running(Ary) of
         true ->
-            create_pid_for_node(Ary, WsName);
+            create_pids_for_nodes(Ary, WsName);
         false ->
             ErrColl = start_this_should_not_happen_service(
                 FlowId,
@@ -188,17 +204,17 @@ run_the_test(FlowId, WsName, Ary) ->
             %% there are exception groups for nodes aswell, remove those
             %% too.
             Cleaner = fun(NodeDef) ->
-                {ok, NodeId} = maps:find(id, NodeDef),
+                {ok, NodeId} = maps:find(<<"id">>, NodeDef),
                 clear_exception_group(NodeId, WsName)
             end,
             [Cleaner(NodeDef) || NodeDef <- Ary],
 
-            Pids = create_pid_for_node(Ary, WsName),
+            Pids = create_pids_for_nodes(Ary, WsName),
 
             [
                 trigger_outgoing_messages(
-                    maps:find(type, ND),
-                    maps:find(id, ND),
+                    maps:get(<<"type">>, ND),
+                    maps:get(<<"id">>, ND),
                     WsName
                 )
              || ND <- Ary

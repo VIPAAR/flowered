@@ -32,7 +32,7 @@
 %%
 %%
 subscribe_to_exception_entire_flow(NodeDef, WsName, Pid) ->
-    {ok, FlowId} = maps:find(z, NodeDef),
+    {ok, FlowId} = maps:find(<<"z">>, NodeDef),
     pg:join(pg_exception_group_name(FlowId, WsName), Pid).
 
 subscribe_to_exception_from_node(NodeId, WsName, Pid) ->
@@ -48,9 +48,15 @@ subscribe_to_completed(NodeDef, WsName, Pid) ->
 %% It also provides feed back to the caller as to whether there was a
 %% catch node or not, if not, deal with it yourself is the message.
 %%
+%% This is a Node-RED thing that if an exception occurs and no one is
+%% listening, then it makes a sound and that sound is in the debug panel.
+%% So the user is informed even when there is no catch node there to catch
+%% the exception.
+%%
 post_exception(SrcNode, SrcMsg, ErrMsg) ->
-    {ok, FlowId} = maps:find(z, SrcNode),
-    {ok, NodeId} = maps:find(id, SrcNode),
+    {ok, FlowId} = maps:find(<<"z">>, SrcNode),
+    {ok, NodeId} = maps:find(<<"id">>, SrcNode),
+
     WsName = ws_from(SrcMsg),
 
     case get_members_of_someid(FlowId, WsName) of
@@ -95,7 +101,7 @@ post_completed(NodeDef, Msg) ->
 
 %% clear out the pg group for the complete nodes.
 clear_completed_group(FlowId, WsName) ->
-    clear_pg_group(pg_complete_group_name(#{z => FlowId}, WsName)).
+    clear_pg_group(pg_complete_group_name(#{<<"z">> => FlowId}, WsName)).
 
 clear_exception_group(FlowId, WsName) ->
     clear_pg_group(pg_exception_group_name(FlowId, WsName)).
@@ -117,7 +123,7 @@ pg_exception_group_name(SomeId, WsName) ->
     jstr("catch_nodes_~s_~s", [atom_to_list(WsName), SomeId]).
 
 pg_complete_group_name(NodeDef, WsName) ->
-    {ok, FlowId} = maps:find(z, NodeDef),
+    {ok, FlowId} = maps:find(<<"z">>, NodeDef),
     jstr("complete_nodes_~s_~s", [atom_to_list(WsName), FlowId]).
 
 %%

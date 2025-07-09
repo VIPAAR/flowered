@@ -34,7 +34,7 @@ init([]) ->
                 },
                 #{
                     id => ered_ch4_error_store,
-                    start => {ered_error_store, start, []},
+                    start => {ered_error_store, start_link, []},
                     restart => permanent,
                     type => worker,
                     module => [ered_error_store]
@@ -62,7 +62,7 @@ init([]) ->
                 },
                 #{
                     id => ered_ch7_compute_engine,
-                    start => {ered_compute_engine, start, []},
+                    start => {ered_compute_engine, start_link, []},
                     restart => permanent,
                     type => worker,
                     module => [ered_compute_engine]
@@ -73,6 +73,27 @@ init([]) ->
                     restart => permanent,
                     type => worker,
                     module => [ered_node_registry]
+                 },
+                #{
+                    id => ered_ch8_msg_tracer,
+                    start => {ered_msgtracer_manager, start_link, []},
+                    restart => permanent,
+                    type => worker,
+                    module => [ered_msgtracer_manager]
+                },
+                #{
+                    id => ered_ch9_erlmodule_exchange,
+                    start => {ered_erlmodule_exchange, start_link, []},
+                    restart => permanent,
+                    type => worker,
+                    module => [ered_erlmodule_exchange]
+                },
+                #{
+                    id => ered_ch10_tcp_manager,
+                    start => {ered_tcp_manager, start_link, []},
+                    restart => permanent,
+                    type => worker,
+                    module => [ered_tcp_manager]
                 }
             ]
         }}.

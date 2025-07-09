@@ -40,6 +40,11 @@ send_to_link_call({ok, NodeId}, Msg) ->
             gen_server:cast(Pid, {link_return, Msg})
     end.
 
+%%
+%% last_value returns the last entry in the _linkSource array - that is the
+%% last link-call node that passed on this message. That is also the link-call
+%% node to which we return this message to. But that message will have a new
+%% _linkSource array with that link-call node removed.
 last_value([], _) ->
     empty;
 last_value([H | []], Rest) ->
@@ -55,9 +60,9 @@ handle_event(_, NodeDef) ->
 %%
 %%
 handle_incoming(NodeDef, Msg) ->
-    case maps:find(mode, NodeDef) of
+    case maps:find(<<"mode">>, NodeDef) of
         {ok, <<"link">>} ->
-            case maps:find(links, NodeDef) of
+            case maps:find(<<"links">>, NodeDef) of
                 {ok, Links} ->
                     %% this are all link in nodes and they have no incoming
                     %% wires so we can send them their messages using the
@@ -77,7 +82,7 @@ handle_incoming(NodeDef, Msg) ->
                             ignore;
                         {ok, LinkBack, NewAry} ->
                             send_to_link_call(
-                                maps:find(node, LinkBack),
+                                maps:find(<<"node">>, LinkBack),
                                 maps:put('_linkSource', NewAry, Msg)
                             )
                     end;

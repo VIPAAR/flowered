@@ -7,9 +7,10 @@
 
 stop_all_pids([]) ->
     ok;
+stop_all_pids([Pid | Pids]) when Pid =:= false ->
+    stop_all_pids(Pids);
 stop_all_pids([Pid | Pids]) ->
-    %% none is the websocket name - doesn't exist.
-    is_process_alive(Pid) =/= false andalso Pid ! {stop, none},
+    (is_process_alive(Pid) =/= false) andalso (Pid ! {stop, none}),
     stop_all_pids(Pids).
 
 %%
@@ -18,7 +19,7 @@ stop_all_pids([Pid | Pids]) ->
 %%
 
 ensure_error_store_is_started(TabErrColl, TestName) ->
-    case ered_error_store:start() of
+    case ered_error_store:start_link() of
         {error, {already_started, ErrorStorePid}} ->
             Pid = spawn(?MODULE, not_happen_loop, [TestName, ErrorStorePid]),
             register(TabErrColl, Pid),
@@ -35,16 +36,16 @@ websocket_faker(WsName) ->
     receive
         stop ->
             ok;
-        {debug, Data} ->
+        {debug, Data, normal} ->
             ered_ws_event_exchange:debug_msg({ok, WsName}, normal, Data),
             websocket_faker(WsName);
-        {notice_debug, Data} ->
+        {debug, Data, notice} ->
             ered_ws_event_exchange:debug_msg({ok, WsName}, notice, Data),
             websocket_faker(WsName);
-        {warning_debug, Data} ->
+        {debug, Data, warning} ->
             ered_ws_event_exchange:debug_msg({ok, WsName}, warning, Data),
             websocket_faker(WsName);
-        {error_debug, Data} ->
+        {debug, Data, error} ->
             ered_ws_event_exchange:debug_msg({ok, WsName}, error, Data),
             websocket_faker(WsName);
         {status, NodeId, T, C, S} ->
@@ -125,11 +126,11 @@ create_test_for_flow_file([FileName | MoreFileNames], Acc) ->
         WsName = eunit_test,
         ensure_websocket_listener_is_running(WsName),
 
-        Pids = ered_nodes:create_pid_for_node(Ary, WsName),
+        Pids = ered_startup:create_pids_for_nodes(Ary, WsName),
 
         [
             ered_nodes:trigger_outgoing_messages(
-                maps:find(type, ND), maps:find(id, ND), WsName
+                maps:get(<<"type">>, ND), maps:get(<<"id">>, ND), WsName
             )
          || ND <- Ary
         ],
@@ -201,6 +202,8 @@ foreach_testflow_test_() ->
     pg:start_link(),
     ered_config_store:start(),
     ered_csv_parser_store:start(),
+    ered_msgtracer_manager:start_link(),
+    ered_erlmodule_exchange:start_link(),
 
     {_Cnt, FileNames} = filelib:fold_files(
         io_lib:format("~s/testflows", [code:priv_dir(flowered)]),

@@ -27,7 +27,7 @@
 -import(ered_ws_event_exchange, [
     subscribe/4
 ]).
--import(ered_msg_handling, [
+-import(ered_messages, [
     create_outgoing_msg/1
 ]).
 -import(ered_nodes, [
@@ -44,7 +44,7 @@ start(NodeDef, _WsName) ->
 %%
 handle_event({registered, WsName, _Pid}, NodeDef) ->
     {ok, NodePid} = maps:find('_node_pid_', NodeDef),
-    {ok, NodesToListenTo} = maps:find(scope, NodeDef),
+    {ok, NodesToListenTo} = maps:find(<<"scope">>, NodeDef),
 
     [
         ered_ws_event_exchange:subscribe(
@@ -67,17 +67,21 @@ handle_websocket({status, WsName, NodeId, Txt, Clr, Shp}, NodeDef) ->
     %% TODO should really find the name and type of the source node
     %% TODO but on the other hand, with the node id, the frontend can
     %% TODO do that itself.
-    MsgWithSrc = maps:put(
-        source,
-        #{id => NodeId, type => "", name => ""},
-        Msg
+    send_msg_to_connected_nodes(
+        NodeDef,
+        Msg#{
+            <<"source">> => #{
+                <<"id">> => NodeId,
+                <<"type">> => <<"">>,
+                <<"name">> => <<"">>
+            },
+            <<"status">> => #{
+                <<"fill">> => jstr(Clr),
+                <<"shape">> => jstr(Shp),
+                <<"text">> => jstr(Txt)
+            }
+        }
     ),
-    FinalMsg = maps:put(
-        status,
-        #{fill => jstr(Clr), shape => jstr(Shp), text => Txt},
-        MsgWithSrc
-    ),
-    send_msg_to_connected_nodes(NodeDef, FinalMsg),
     NodeDef;
 handle_websocket(_, NodeDef) ->
     NodeDef.

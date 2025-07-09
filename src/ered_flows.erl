@@ -14,7 +14,7 @@
 %% an entire flow should be here.
 %%
 
--import(ered_msg_handling, [
+-import(ered_messages, [
     decode_json/1
 ]).
 
@@ -22,8 +22,8 @@
 %% return the env array on the tab or empty array.
 find_tab_env_ary([]) ->
     [];
-find_tab_env_ary([NodeDef = #{type := <<"tab">>} | _T]) ->
-    case maps:find(env, NodeDef) of
+find_tab_env_ary([NodeDef = #{<<"type">> := <<"tab">>} | _T]) ->
+    case maps:find(<<"env">>, NodeDef) of
         {ok, V} ->
             V;
         _ ->
@@ -38,7 +38,7 @@ find_tab_env_ary([_H | T]) ->
 %% to define a timeout per flow test. This is possible by using the ENV
 %% variables, for a flow tab:
 %%
-%%   double-click on flow tab --> properties --> env --> TIMEOUT
+%%   double-click on flow tab --> properties --> env --> ERED_TIMEOUT
 %%
 %% a timeout value is always in seconds.
 %%
@@ -46,8 +46,8 @@ find_tab_env_ary([_H | T]) ->
 %% value of this function is milliseconds, even if the original value in
 %% the flow was seconds.
 obtain_timeout([]) ->
-    1234;
-obtain_timeout([#{value := V, name := <<"ERED_TIMEOUT">>} | _T]) ->
+    2222;
+obtain_timeout([#{<<"value">> := V, <<"name">> := <<"ERED_TIMEOUT">>} | _T]) ->
     element(1, string:to_integer(V)) * 1000;
 obtain_timeout([_H | T]) ->
     obtain_timeout(T).
@@ -64,15 +64,19 @@ parse_flow_file(FileName) ->
 %%
 %%
 append_tab_name_to_filename(Ary, FileName) ->
-    append_tab_name_to_filename(Ary, FileName, maps:find(z, lists:nth(2, Ary))).
+    append_tab_name_to_filename(
+        Ary,
+        FileName,
+        maps:find(<<"z">>, lists:nth(2, Ary))
+    ).
 
 append_tab_name_to_filename([], FileName, {ok, TabId}) ->
     {TabId, FileName};
 append_tab_name_to_filename([NodeDef | MoreNodeDefs], FileName, {ok, TabId}) ->
-    case maps:find(type, NodeDef) of
+    case maps:find(<<"type">>, NodeDef) of
         {ok, <<"tab">>} ->
-            {ok, Val} = maps:find(label, NodeDef),
-            {ok, TabId2} = maps:find(id, NodeDef),
+            {ok, Val} = maps:find(<<"label">>, NodeDef),
+            {ok, TabId2} = maps:find(<<"id">>, NodeDef),
 
             {TabId2,
                 binary_to_list(
@@ -91,7 +95,7 @@ append_tab_name_to_filename([NodeDef | MoreNodeDefs], FileName, {ok, TabId}) ->
 %%
 get_pending_envvar([]) ->
     false;
-get_pending_envvar([#{value := V, name := <<"ERED_PENDING">>} | _T]) ->
+get_pending_envvar([#{<<"value">> := V, <<"name">> := <<"ERED_PENDING">>} | _T]) ->
     (V == <<"true">>) or (V == <<"TRUE">>);
 get_pending_envvar([_H | T]) ->
     get_pending_envvar(T).
@@ -103,7 +107,7 @@ is_test_case_pending(Ary) ->
 %%
 keep_running([]) ->
     false;
-keep_running([#{value := V, name := <<"ERED_KEEPRUNNING">>} | _T]) ->
+keep_running([#{<<"value">> := V, <<"name">> := <<"ERED_KEEPRUNNING">>} | _T]) ->
     (V == <<"true">>) or (V == <<"TRUE">>);
 keep_running([_H | T]) ->
     keep_running(T).
@@ -119,7 +123,7 @@ should_keep_flow_running(Ary) ->
 %% Hence these test flows are not pending, they are "flow editor only tests"
 not_eunit_test([]) ->
     false;
-not_eunit_test([#{value := V, name := <<"ERED_NOT_EUNIT">>} | _T]) ->
+not_eunit_test([#{<<"value">> := V, <<"name">> := <<"ERED_NOT_EUNIT">>} | _T]) ->
     (V == <<"true">>) or (V == <<"TRUE">>);
 not_eunit_test([_H | T]) ->
     not_eunit_test(T).

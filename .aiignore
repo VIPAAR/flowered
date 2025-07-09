@@ -1,0 +1,10 @@
+*.sh
+*.erl
+*.hrl
+*.xrl
+*.yrl
+*.yml
+*.html
+*.json
+.aiignore
+Dockerfile.*

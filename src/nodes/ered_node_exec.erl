@@ -33,21 +33,25 @@
 %%     }
 %% ]
 %%
+
+%%
+%% TODO investigate how thsi interacts with a supervisor node supervising
+%% TODO this node. I don't think it is supported at the moment.
 %%
 
 -import(ered_nodered_comm, [
     node_status/5,
     node_status_clear/2,
+    post_exception_or_debug/3,
     unsupported/3,
     ws_from/1
 ]).
 -import(ered_nodes, [
     get_prop_value_from_map/3,
     jstr/2,
-    post_exception_or_debug/3,
     send_msg_to_connected_nodes/2
 ]).
--import(ered_msg_handling, [
+-import(ered_messages, [
     convert_to_num/1,
     convert_units_to_milliseconds/2,
     to_bool/1
@@ -78,8 +82,8 @@ handle_event(_, NodeDef) ->
 
 handle_msg({exec_process_died, Msg}, NodeDef) ->
     ProcessList = maps:get('_process_list', NodeDef),
-    MachPid = maps:get(pid, maps:get(payload, Msg)),
-    StatusCode = maps:get(code, maps:get(payload, Msg)),
+    MachPid = maps:get(<<"pid">>, maps:get(<<"payload">>, Msg)),
+    StatusCode = maps:get(<<"code">>, maps:get(<<"payload">>, Msg)),
 
     node_status_clear(ws_from(Msg), NodeDef),
 
@@ -94,12 +98,12 @@ handle_msg({exec_process_died, Msg}, NodeDef) ->
         ),
         Msg};
 handle_msg({incoming, Msg}, NodeDef) ->
-    case maps:find(kill, Msg) of
+    case maps:find(<<"kill">>, Msg) of
         {ok, Signal} ->
             %% kill a command
             %% Signal is something like SIGINT, SIGTERM, ...
             Tuple =
-                case maps:find(pid, Msg) of
+                case maps:find(<<"pid">>, Msg) of
                     {ok, MachPid} ->
                         %% this returns false if key is not found.
                         lists:keyfind(
@@ -126,7 +130,7 @@ handle_msg({incoming, Msg}, NodeDef) ->
             end;
         _ ->
             %% execute a command
-            case to_bool(maps:get(useSpawn, NodeDef)) of
+            case to_bool(maps:get(<<"useSpawn">>, NodeDef)) of
                 true ->
                     {handled, start_command_running(Msg, NodeDef),
                         dont_send_complete_msg};
@@ -141,7 +145,7 @@ handle_msg(_, NodeDef) ->
 %%
 %%
 start_command_running(Msg, NodeDef) ->
-    start_command_running(maps:get(command, NodeDef), Msg, NodeDef).
+    start_command_running(maps:get(<<"command">>, NodeDef), Msg, NodeDef).
 
 start_command_running(<<>>, Msg, NodeDef) ->
     ErrMsg = jstr(
@@ -150,25 +154,25 @@ start_command_running(<<>>, Msg, NodeDef) ->
     post_exception_or_debug(NodeDef, Msg, ErrMsg),
     NodeDef;
 start_command_running(Cmd, Msg, NodeDef) ->
-    Wires = maps:get(wires, NodeDef),
+    Wires = maps:get(<<"wires">>, NodeDef),
 
     Opts = #{
-        spawn => to_bool(maps:get(useSpawn, NodeDef)),
-        append => maps:get(append, NodeDef),
+        spawn => to_bool(maps:get(<<"useSpawn">>, NodeDef)),
+        append => maps:get(<<"append">>, NodeDef),
         timeout => convert_to_num(
-            get_prop_value_from_map(timer, NodeDef, <<"-1">>)
+            get_prop_value_from_map(<<"timer">>, NodeDef, <<"-1">>)
         ),
-        addpayload => maps:get(addpay, NodeDef)
+        addpayload => maps:get(<<"addpay">>, NodeDef)
     },
 
-    case maps:get(append, NodeDef) of
+    case maps:get(<<"append">>, NodeDef) of
         <<"">> ->
             ok;
         _ ->
             unsupported(NodeDef, Msg, "append value, will be ignored")
     end,
 
-    case maps:get(addpay, NodeDef) of
+    case maps:get(<<"addpay">>, NodeDef) of
         <<"">> ->
             ok;
         _ ->
