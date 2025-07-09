@@ -10,19 +10,51 @@
 %% Inject node should have at least one outgoing wire, if not then the
 %% needle won't hit the vein, i.e. the message won't flow through any nodes.
 %%
+%%  "id": "dc5aaefd109f64b8",
+%%  "type": "inject",
+%%  "z": "c4b44f0eb78bc401",
+%%  "g": "3e66f8d35dcccd45",
+%%  "name": "",
+%%  "props": [
+%%      {
+%%          "p": "payload"
+%%      },
+%%      {
+%%          "p": "action",
+%%          "v": "donothing",
+%%          "vt": "str"
+%%      }
+%%  ],
+%%  "repeat": "",  <<----+- if node is trigger automagically via "once",
+%%  "crontab": "", <<---/ then repeat can be used to continue the inject
+%%  "once": false, <<--/ but this isn't supported. ('once' either true or false).
+%%  "onceDelay": 0.1,
+%%  "topic": "",
+%%  "payload": "donothing",
+%%  "payloadType": "str",
+%%  "x": 218,
+%%  "y": 783.75,
+%%  "wires": [
+%%      [
+%%          "5c1cf21f1fb90b33"
+%%      ]
+%%  ]
+%%
+%%
 
 -import(ered_nodes, [
+    check_config/4,
     get_prop_value_from_map/2,
     get_prop_value_from_map/3,
     jstr/1,
     jstr/2,
-    post_exception_or_debug/3,
     send_msg_to_connected_nodes/2
 ]).
 -import(ered_nodered_comm, [
+    post_exception_or_debug/3,
     unsupported/3
 ]).
--import(ered_msg_handling, [
+-import(ered_messages, [
     convert_to_num/1,
     decode_json/1,
     get_prop/2,
@@ -36,32 +68,78 @@
 
 %%
 %%
-start(NodeDef, _WsName) ->
-    ered_node:start(NodeDef, ?MODULE).
+% erlfmt:ignore - alignment
+start(NodeDef, WsName) ->
+    %% TODO support repeat and once and crontab
+    case {
+        check_config(<<"repeat">>,  <<"">>, NodeDef, WsName),
+        check_config(<<"crontab">>, <<"">>, NodeDef, WsName),
+        check_config(<<"once">>,    false,  NodeDef, WsName)
+    } of
+        {ok,ok,ok} ->
+            ered_node:start(NodeDef, ?MODULE);
+        _ ->
+            ered_node:start(NodeDef, ered_node_ignore)
+    end.
+
+%%
+%%
+handle_event(_, NodeDef) ->
+    NodeDef.
+
+%%
+%% outgoing messages are triggered by button presses on the UI
+%%
+handle_msg({outgoing, Msg}, NodeDef) ->
+    case maps:find(<<"props">>, NodeDef) of
+        {ok, Val} ->
+            Props = Val;
+        _ ->
+            Props = []
+    end,
+
+    try
+        Msg2 = parse_props(Props, NodeDef, Msg),
+        send_msg_to_connected_nodes(NodeDef, Msg2),
+        %% this should be done by the behaviour but it does not allow
+        %% outgoing messages to generated completed messages, so do this
+        %% here directly.
+        post_completed(NodeDef, Msg2),
+        {handled, NodeDef, Msg2}
+    catch
+        throw:dont_send_message ->
+            {handled, NodeDef, Msg}
+    end;
+handle_msg(_, NodeDef) ->
+    {unhandled, NodeDef}.
+
+%%
+%% ------------------------ Helpers
+%%
 
 %%
 %%
 value_for_proptype(<<"date">>, _Val, Prop, _NodeDef, Msg) ->
-    set_prop_value(Prop, Msg, timestamp());
+    set_prop_value(Prop, timestamp(), Msg);
 value_for_proptype(<<"json">>, Val, Prop, _NodeDef, Msg) ->
-    set_prop_value(Prop, Msg, decode_json(Val));
+    set_prop_value(Prop, decode_json(Val), Msg);
 value_for_proptype(<<"str">>, Val, Prop, _NodeDef, Msg) ->
-    set_prop_value(Prop, Msg, Val);
+    set_prop_value(Prop, Val, Msg);
 value_for_proptype(<<"num">>, Val, Prop, _NodeDef, Msg) ->
-    set_prop_value(Prop, Msg, convert_to_num(Val));
+    set_prop_value(Prop, convert_to_num(Val), Msg);
 value_for_proptype(<<"bool">>, Val, Prop, _NodeDef, Msg) ->
-    set_prop_value(Prop, Msg, to_bool(Val));
+    set_prop_value(Prop, to_bool(Val), Msg);
 value_for_proptype(<<"msg">>, Val, Prop, _NodeDef, Msg) ->
     case get_prop({ok, Val}, Msg) of
         {ok, Value, _} ->
-            set_prop_value(Prop, Msg, Value);
+            set_prop_value(Prop, Value, Msg);
         _ ->
-            set_prop_value(Prop, Msg, <<>>)
+            set_prop_value(Prop, <<>>, Msg)
     end;
 value_for_proptype(<<"jsonata">>, Val, Prop, NodeDef, Msg) ->
     case erlang_red_jsonata:execute(Val, Msg) of
         {ok, Result} ->
-            set_prop_value(Prop, Msg, Result);
+            set_prop_value(Prop, Result, Msg);
         {error, Error} ->
             unsupported(
                 NodeDef,
@@ -89,19 +167,19 @@ value_for_proptype(PropType, _Val, PropName, NodeDef, Msg) ->
 %% string value iff the type is "str" otherwise the value is set on
 %% the property defintion, i.e. 'v'.
 obtain_topic_value(NodeDef, _Prop, <<"str">>) ->
-    get_prop_value_from_map(topic, NodeDef);
+    get_prop_value_from_map(<<"topic">>, NodeDef);
 obtain_topic_value(_NodeDef, Prop, _) ->
-    get_prop_value_from_map(v, Prop).
+    get_prop_value_from_map(<<"v">>, Prop).
 
 %%
 %%
 parse_props([], _, Msg) ->
     Msg;
 parse_props([Prop | RestProps], NodeDef, Msg) ->
-    case maps:find(p, Prop) of
+    case maps:find(<<"p">>, Prop) of
         {ok, <<"payload">>} ->
-            Val = get_prop_value_from_map(payload, NodeDef),
-            PropType = get_prop_value_from_map(payloadType, NodeDef),
+            Val = get_prop_value_from_map(<<"payload">>, NodeDef),
+            PropType = get_prop_value_from_map(<<"payloadType">>, NodeDef),
 
             parse_props(
                 RestProps,
@@ -109,7 +187,7 @@ parse_props([Prop | RestProps], NodeDef, Msg) ->
                 value_for_proptype(PropType, Val, <<"payload">>, NodeDef, Msg)
             );
         {ok, <<"topic">>} ->
-            PropType = get_prop_value_from_map(vt, Prop),
+            PropType = get_prop_value_from_map(<<"vt">>, Prop),
             Val = obtain_topic_value(NodeDef, Prop, PropType),
 
             parse_props(
@@ -118,8 +196,8 @@ parse_props([Prop | RestProps], NodeDef, Msg) ->
                 value_for_proptype(PropType, Val, <<"topic">>, NodeDef, Msg)
             );
         {ok, PropName} ->
-            Val = get_prop_value_from_map(v, Prop),
-            PropType = get_prop_value_from_map(vt, Prop),
+            Val = get_prop_value_from_map(<<"v">>, Prop),
+            PropType = get_prop_value_from_map(<<"vt">>, Prop),
             parse_props(
                 RestProps,
                 NodeDef,
@@ -129,34 +207,3 @@ parse_props([Prop | RestProps], NodeDef, Msg) ->
             unsupported(NodeDef, Msg, jstr("Prop: NoMATCH: ~p\n", [Prop])),
             parse_props(RestProps, NodeDef, Msg)
     end.
-
-%%
-%%
-handle_event(_, NodeDef) ->
-    NodeDef.
-
-%%
-%% outgoing messages are triggered by button presses on the UI
-%%
-handle_msg({outgoing, Msg}, NodeDef) ->
-    case maps:find(props, NodeDef) of
-        {ok, Val} ->
-            Props = Val;
-        _ ->
-            Props = []
-    end,
-
-    try
-        Msg2 = parse_props(Props, NodeDef, Msg),
-        send_msg_to_connected_nodes(NodeDef, Msg2),
-        %% this should be done by the behaviour but it does not allow
-        %% outgoing messages to generated completed messages, so do this
-        %% here directly.
-        post_completed(NodeDef, Msg2),
-        {handled, NodeDef, Msg2}
-    catch
-        throw:dont_send_message ->
-            {handled, NodeDef, Msg}
-    end;
-handle_msg(_, NodeDef) ->
-    {unhandled, NodeDef}.

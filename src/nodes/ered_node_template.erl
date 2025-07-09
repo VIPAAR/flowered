@@ -31,25 +31,22 @@
     this_should_not_happen/2
 ]).
 
--import(ered_msg_handling, [
+-import(ered_messages, [
     decode_json/1,
+    set_prop_value/3,
     map_keys_to_lists/1
 ]).
 
 doit(Prop, <<"msg">>, Template, <<"plain">>, <<"str">>, Msg) ->
-    Msg2 = maps:put(binary_to_atom(Prop), Template, Msg),
-    {ok, Msg2};
+    {ok, set_prop_value(Prop, Template, Msg)};
 doit(Prop, <<"msg">>, Template, <<"mustache">>, <<"str">>, Msg) ->
     MustachedRendered = bbmustache:render(Template, map_keys_to_lists(Msg)),
-    Msg2 = maps:put(binary_to_atom(Prop), MustachedRendered, Msg),
-    {ok, Msg2};
+    {ok, set_prop_value(Prop, MustachedRendered, Msg)};
 doit(Prop, <<"msg">>, Template, <<"plain">>, <<"json">>, Msg) ->
-    Msg2 = maps:put(binary_to_atom(Prop), decode_json(Template), Msg),
-    {ok, Msg2};
+    {ok, set_prop_value(Prop, decode_json(Template), Msg)};
 doit(Prop, <<"msg">>, Template, <<"mustache">>, <<"json">>, Msg) ->
     MustachedRendered = bbmustache:render(Template, map_keys_to_lists(Msg)),
-    Msg2 = maps:put(binary_to_atom(Prop), decode_json(MustachedRendered), Msg),
-    {ok, Msg2};
+    {ok, set_prop_value(Prop, decode_json(MustachedRendered), Msg)};
 doit(_, _, _, _, _, _) ->
     unsupported.
 
@@ -65,12 +62,13 @@ handle_event(_, NodeDef) ->
 
 %%
 %%
+% erlfmt:ignore - alginment
 handle_incoming(NodeDef, Msg) ->
-    {ok, Prop} = maps:find(field, NodeDef),
-    {ok, PropType} = maps:find(fieldType, NodeDef),
-    {ok, Syntax} = maps:find(syntax, NodeDef),
-    {ok, Template} = maps:find(template, NodeDef),
-    {ok, Output} = maps:find(output, NodeDef),
+    {ok, Prop}     = maps:find(<<"field">>,     NodeDef),
+    {ok, PropType} = maps:find(<<"fieldType">>, NodeDef),
+    {ok, Syntax}   = maps:find(<<"syntax">>,    NodeDef),
+    {ok, Template} = maps:find(<<"template">>,  NodeDef),
+    {ok, Output}   = maps:find(<<"output">>,    NodeDef),
 
     case doit(Prop, PropType, Template, Syntax, Output, Msg) of
         {ok, Msg2} ->
@@ -85,10 +83,10 @@ handle_incoming(NodeDef, Msg) ->
             %% be an error but not supporting formatting is kind of ...
             %% an error really but since I don't raise an error here, set
             %% the content in the msg.
-            Msg2 = maps:put(binary_to_atom(Prop), Template, Msg),
+            Msg2 = set_prop_value(Prop, Template, Msg),
 
             send_msg_to_connected_nodes(NodeDef, Msg2),
-            {NodeDef, Msg}
+            {NodeDef, Msg2}
     end.
 
 %%

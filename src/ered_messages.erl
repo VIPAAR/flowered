@@ -1,4 +1,6 @@
--module(ered_msg_handling).
+-module(ered_messages).
+
+-include("ered_nodes.hrl").
 
 -export([
     convert_to_num/1,
@@ -6,6 +8,7 @@
     create_outgoing_msg/1,
     decode_json/1,
     delete_prop/2,
+    encode_json/1,
     escape_specials/1,
     get_prop/2,
     is_same/2,
@@ -19,7 +22,7 @@
 ]).
 
 %%
-%% Helper functions for dealing with messages and their electics.
+%% Helper functions for dealing with messages and their electic needs.
 %%
 
 -import(ered_nodes, [
@@ -107,24 +110,29 @@ timestamp() ->
 decode_json(Val) when is_list(Val) ->
     decode_json(list_to_binary(Val));
 decode_json(Val) ->
-    AtomizeKeys = fun(Key, Value, Acc) ->
-        [{binary_to_atom(Key), Value} | Acc]
-    end,
-    {Obj, _, _} = json:decode(Val, ok, #{object_push => AtomizeKeys}),
-    Obj.
+    json:decode(Val).
 
-any_to_atom(V) when is_atom(V) ->
-    V;
-any_to_atom(V) when is_binary(V) ->
-    binary_to_atom(V);
-any_to_atom(V) when is_list(V) ->
-    list_to_atom(V);
-any_to_atom(V) when is_integer(V) ->
-    list_to_atom(integer_to_list(V));
-any_to_atom(V) when is_float(V) ->
-    list_to_atom(float_to_list(V, [short]));
-any_to_atom(V) ->
-    V.
+%%
+%%
+%% This is json:encode except that Pids are converted to strings. Used for
+%% the contents of debug messages - that may certainly contain a Pid or two.
+%% Tuples are also a foe of JSON - convert them to lists.
+%%
+encoder({K, V}, Encode) ->
+    json:encode_value([K, V], Encode);
+encoder([{_, _} | _] = Value, Encode) ->
+    json:encode_key_value_list(Value, Encode);
+encoder(Other, Encode) when is_tuple(Other) ->
+    json:encode_value(tuple_to_list(Other), Encode);
+encoder(Other, Encode) when is_reference(Other) ->
+    json:encode_value(list_to_binary(ref_to_list(Other)), Encode);
+encoder(Other, Encode) when is_pid(Other) ->
+    json:encode_value(list_to_binary(pid_to_list(Other)), Encode);
+encoder(Other, Encode) ->
+    json:encode_value(Other, Encode).
+%%
+encode_json(Value2) ->
+    json:encode(Value2, fun(Value, Encode) -> encoder(Value, Encode) end).
 
 %%
 %% get prop can used to retrieve a nestd value from the Msg map, i.e.,
@@ -143,14 +151,21 @@ any_to_atom(V) ->
 %%    {ok, Value, Prop}
 %% or
 %%    {undefined, Prop}
+%% or
+%%    {error, ErrorMsg}
 %%
 get_prop({ok, Prop}, Msg) ->
-    KeyNames = lists:map(fun any_to_atom/1, string:split(Prop, ".", all)),
-    case mapz:deep_find(KeyNames, Msg) of
-        {ok, V} ->
-            {ok, V, Prop};
-        error ->
-            {undefined, Prop}
+    case erl_attributeparser:attrbutes_to_array(Prop) of
+        {ok, KeyNames} ->
+            case mapz:deep_find(KeyNames, Msg) of
+                {ok, V} ->
+                    {ok, V, Prop};
+                error ->
+                    {undefined, Prop}
+            end;
+        Error ->
+            io:format("ERROR get_prop {{{ ~p }}}~n", [Error]),
+            Error
     end.
 
 %%
@@ -166,15 +181,24 @@ retrieve_prop_value(PropName, Msg) ->
 
 %% Set a value in a nested map. This supports using nesting parameters to
 %% set a value somewhere in a map.
--spec set_prop_value(PropName :: string(), Msg :: map(), Value :: any()) ->
+-spec set_prop_value(PropName :: string(), Value :: any(), Msg :: map()) ->
     map().
-set_prop_value(PropName, Msg, Value) ->
-    KeyNames = lists:map(fun any_to_atom/1, string:split(PropName, ".", all)),
-    %% silently ignore any key that isn't available
-    try
-        mapz:deep_put(KeyNames, Value, Msg)
-    catch
-        error:_Error ->
+set_prop_value(PropName, Value, Msg) ->
+    case erl_attributeparser:attrbutes_to_array(PropName) of
+        {ok, KeyNames} ->
+            %% silently ignore any key that isn't available
+            try
+                mapz:deep_put(KeyNames, Value, Msg)
+            catch
+                error:Error ->
+                    io:format(
+                        "ERROR setting value: ~p =.=> ~p~n",
+                        [PropName, Error]
+                    ),
+                    Msg
+            end;
+        Error ->
+            io:format("ERROR setting value: ~p ==> ~p~n", [PropName, Error]),
             Msg
     end.
 
@@ -186,29 +210,33 @@ set_prop_value(PropName, Msg, Value) ->
 delete_prop({ok, PropName}, Msg) ->
     delete_prop(PropName, Msg);
 delete_prop(PropName, Msg) ->
-    KeyNames = lists:map(fun any_to_atom/1, string:split(PropName, ".", all)),
-    %% silently ignore any key that isn't available
-
-    %% deep_remove seems to delete keeps if other keys don't exist, so this
-    %% pre-check ensures there is a value
-    %% see: https://github.com/eproxus/mapz/issues/1
-    %% TODO remove this if deep_remove is fixed
-    case mapz:deep_find(KeyNames, Msg) of
-        {ok, _} ->
-            try
-                mapz:deep_remove(KeyNames, Msg)
-            catch
-                error:_Error ->
+    case erl_attributeparser:attrbutes_to_array(PropName) of
+        {ok, KeyNames} ->
+            %% silently ignore any key that isn't available
+            %% deep_remove seems to delete keeps if other keys don't exist,
+            %% so this pre-check ensures there is a value
+            %% see: https://github.com/eproxus/mapz/issues/1
+            %% TODO remove this if deep_remove is ever fixed
+            case mapz:deep_find(KeyNames, Msg) of
+                {ok, _} ->
+                    try
+                        mapz:deep_remove(KeyNames, Msg)
+                    catch
+                        error:_Error ->
+                            Msg
+                    end;
+                _ ->
                     Msg
             end;
-        _ ->
+        _Error ->
+            % silently ignore errors.
             Msg
     end.
 
 %%
 %% Generate an empty message map with just an _msgid
 create_outgoing_msg(WsName) ->
-    {outgoing, #{'_msgid' => generate_id(), '_ws' => WsName}}.
+    {outgoing, ?PUT_WS(#{'_msgid' => generate_id()})}.
 
 %%
 %%
@@ -267,6 +295,10 @@ to_bool(_) -> true.
 %% by \\r \\t \\n - this allows for test definitions that include \r and
 %% not a "return" or "tab" value.
 %%
+escape_specials(Str) when is_integer(Str) ->
+    escape_specials(integer_to_binary(Str));
+escape_specials(Str) when is_atom(Str) ->
+    escape_specials(atom_to_binary(Str));
 escape_specials(Str) ->
     re:replace(
         re:replace(

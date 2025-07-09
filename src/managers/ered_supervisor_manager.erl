@@ -26,15 +26,15 @@ start_link(NodePid, NodeDef, Children) ->
 
     Pid = start_or_kill(MgrId, [NodePid, NodeDef, Children]),
     NodePid ! {supervisor_node, {supervisor_started, Pid}},
-    NodePid ! {supervisor_node, {monitor_this_process, Pid}},
     {ok, Pid}.
 
+% erlfmt:ignore - alignment
 init([_NodePid, NodeDef, Children]) ->
     SupOpts = #{
-        strategy => binary_to_atom(maps:get(strategy, NodeDef)),
-        intensity => binary_to_integer(maps:get(intensity, NodeDef)),
-        period => binary_to_integer(maps:get(period, NodeDef)),
-        auto_shutdown => binary_to_atom(maps:get(auto_shutdown, NodeDef))
+        strategy      => binary_to_atom(maps:get(<<"strategy">>,      NodeDef)),
+        intensity     => binary_to_integer(maps:get(<<"intensity">>,  NodeDef)),
+        period        => binary_to_integer(maps:get(<<"period">>,     NodeDef)),
+        auto_shutdown => binary_to_atom(maps:get(<<"auto_shutdown">>, NodeDef))
     },
     {ok, {SupOpts, Children}}.
 

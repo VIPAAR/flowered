@@ -17,17 +17,20 @@
 
 -import(ered_nodes, [
     jstr/2,
-    post_exception_or_debug/3,
     send_msg_to_connected_nodes/2
 ]).
 -import(ered_nodered_comm, [
     debug/3,
     debug_string/2,
+    post_exception_or_debug/3,
     ws_from/1,
     unsupported/3
 ]).
--import(ered_msg_handling, [
-    decode_json/1
+-import(ered_messages, [
+    decode_json/1,
+    encode_json/1,
+    get_prop/2,
+    set_prop_value/3
 ]).
 %%
 %%
@@ -55,7 +58,7 @@ action_to_content(Val, <<"obj">>, _Pretty) ->
     {ok, decode_json(Val)};
 action_to_content(Val, <<"str">>, _Pretty) ->
     %% convert to object to Javascript string
-    {ok, json:encode(Val)};
+    {ok, iolist_to_binary(encode_json(Val))};
 action_to_content(_, _, _) ->
     unsupported.
 
@@ -67,30 +70,37 @@ handle_event(_, NodeDef) ->
 %%
 %%
 handle_msg({incoming, Msg}, NodeDef) ->
-    {ok, Prop} = maps:find(property, NodeDef),
-    case maps:find(binary_to_atom(Prop), Msg) of
-        {ok, Val} ->
-            {ok, Action} = maps:find(action, NodeDef),
-            {ok, Pretty} = maps:find(pretty, NodeDef),
+    case get_prop(maps:find(<<"property">>, NodeDef), Msg) of
+        {ok, Val, Prop} ->
+            {ok, Action} = maps:find(<<"action">>, NodeDef),
+            {ok, Pretty} = maps:find(<<"pretty">>, NodeDef),
 
             try
                 case action_to_content(Val, Action, Pretty) of
                     {ok, Response} ->
-                        Msg2 = maps:put(payload, Response, Msg),
+                        Msg2 = set_prop_value(Prop, Response, Msg),
                         send_msg_to_connected_nodes(NodeDef, Msg2),
                         {handled, NodeDef, Msg2};
                     unsupported ->
                         ErrMsg = jstr("Unsupported Action: ~p", [Action]),
                         unsupported(NodeDef, Msg, ErrMsg),
+                        {handled, NodeDef, Msg};
+                    What ->
+                        post_exception_or_debug(
+                            NodeDef, Msg, jstr("What?: ~p", [What])
+                        ),
                         {handled, NodeDef, Msg}
                 end
             catch
-                E:F ->
-                    ErrMsg2 = io_lib:format("Exception: ~p ~p", [E, F]),
+                E:F:S ->
+                    ErrMsg2 = jstr(
+                        "Exception: ~p:~p Stack: {{ ~p }}",
+                        [E, F, S]
+                    ),
                     post_exception_or_debug(NodeDef, Msg, ErrMsg2),
                     {handled, NodeDef, Msg}
             end;
-        _ ->
+        {undefined, Prop} ->
             ErrMsg = jstr("Property not defined on Msg: ~p --> ~p", [Prop, Msg]),
             post_exception_or_debug(NodeDef, Msg, ErrMsg),
             {handled, NodeDef, Msg}
