@@ -1,6 +1,6 @@
 {application, flowered, [
     {description, "A library that can run Node-RED flows"},
-    {vsn, "0.99.0"},
+    {vsn, "0.99.1"},
     {registered, [erlang_red_sup]},
     {applications, [
         kernel,
