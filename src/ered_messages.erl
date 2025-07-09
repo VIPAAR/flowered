@@ -272,13 +272,16 @@ key_to_list(V) ->
 
 %%
 %%
-map_keys_to_lists(Map) ->
+map_keys_to_lists(Map) when is_map(Map) ->
     maps:from_list(
         lists:map(
-            fun({D, E}) -> {key_to_list(D), E} end,
+            fun({D, E}) -> {key_to_list(D), map_keys_to_lists(E)} end,
             maps:to_list(Map)
         )
-    ).
+     );
+map_keys_to_lists(V) ->
+    V.
+
 
 %%
 %%
