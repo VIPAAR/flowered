@@ -8,7 +8,9 @@
     post_exception/3,
     subscribe_to_completed/3,
     subscribe_to_exception_entire_flow/3,
-    subscribe_to_exception_from_node/3
+    subscribe_to_exception_from_node/3,
+    pg_exception_group_name/2,
+    pg_complete_group_name/2
 ]).
 
 %%
