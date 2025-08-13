@@ -58,7 +58,7 @@ missing_secret_test() ->
         ?assert(false)
     end.
 
-missing_signature_sertting_test() ->
+missing_signature_setting_test() ->
     os:unsetenv("FUNCTION_NODE_SECRET"),
     Code = <<"ok">>,
     Secret = "a-real-secret",
