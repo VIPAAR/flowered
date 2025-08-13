@@ -58,6 +58,24 @@ missing_secret_test() ->
         ?assert(false)
     end.
 
+missing_signature_sertting_test() ->
+    os:unsetenv("FUNCTION_NODE_SECRET"),
+    Code = <<"ok">>,
+    Secret = "a-real-secret",
+    Signature = crypto:mac(hmac, sha256, Secret, Code),
+    NodeDef = prepare(Code, Signature),
+    NewNodeDef = maps:remove(<<"signature">>, NodeDef),
+
+    Message = build_payload(<<"Hello">>, ?WS_NAME),
+    {ok, Pid} = ered_node_function:start(NewNodeDef, self()),
+    gen_server:cast(Pid, {incoming, Message}),
+
+    receive
+        {error, Msg} ->
+            ?assertEqual(<<"signature missed">>, Msg)
+    after 5000 ->
+        ?assert(false)
+    end.
 
 prepare(Code, Signature) ->
     logger:set_primary_config(level, debug),
