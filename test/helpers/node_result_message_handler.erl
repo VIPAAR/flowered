@@ -2,7 +2,7 @@
 %% A genserver which will be joined to completed group and exception group,
 %% then forward the message to test process.
 %%
--module(node_response_server).
+-module(node_result_message_handler).
 
 -behaviour(gen_server).
 -export([start_link/2]).
@@ -13,9 +13,8 @@ start_link(NodeDef, Pid) ->
 
 init([NodeDef, Pid]) ->
     WsName = maps:get('_node_pid_', NodeDef),
-    {ok, FlowId} = maps:find(<<"z">>, NodeDef),
-    pg:join(ered_message_exchange:pg_complete_group_name(NodeDef, WsName), self()),
-    pg:join(ered_message_exchange:pg_exception_group_name(FlowId, WsName), self()),
+    ered_message_exchange:subscribe_to_completed(NodeDef, WsName, self()),
+    ered_message_exchange:subscribe_to_exception_entire_flow(NodeDef, WsName, self()),
     {ok, #{node_def => NodeDef, pid => Pid}}.
 
 handle_cast({completed_msg, _, Msg}, State) ->

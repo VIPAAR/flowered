@@ -1,27 +1,16 @@
 -module(function_node_signature_test).
 -include_lib("eunit/include/eunit.hrl").
 
--define(NODE_PID, node_pid_function).
+-define(WS_NAME, node_pid_function).
 
 with_valid_signature_test() ->
-    FlowId = "flowId",
-    NodeId = "nodeId",
-    WsName = node_pid_function,
-    Secret = "a-real-secret",
-
-    os:putenv("FUNCTION_NODE_SECRET", Secret),
-    logger:set_primary_config(level, debug),
-    pg:start_link(),
-    ered_config_store:start(),
-    ered_msgtracer_manager:start_link(),
-    ered_erlmodule_exchange:start_link(),
-
     Code = <<"ok">>,
+    Secret = "a-real-secret",
+    os:putenv("FUNCTION_NODE_SECRET", Secret),
     Signature = crypto:mac(hmac, sha256, Secret, Code),
-    NodeDef = build_node_def(FlowId, NodeId, WsName, Code, Signature),
-    node_response_server:start_link(NodeDef, self()),
+    NodeDef = prepare(Code, Signature),
 
-    Message = build_payload(<<"Hello">>, WsName),
+    Message = build_payload(<<"Hello">>, ?WS_NAME),
     {ok, Pid} = ered_node_function:start(NodeDef, self()),
     gen_server:cast(Pid, {incoming, Message}),
 
@@ -31,6 +20,59 @@ with_valid_signature_test() ->
     after 5000 ->
         ?assert(false)
     end.
+
+invalid_signature_test() ->
+    Secret = "a-real-secret",
+    os:putenv("FUNCTION_NODE_SECRET", Secret),
+
+    Code = <<"ok">>,
+    Signature = crypto:mac(hmac, sha256, Secret, Code),
+    NodeDef = prepare(<<"error">>, Signature),
+
+    Message = build_payload(<<"Hello">>, ?WS_NAME),
+    {ok, Pid} = ered_node_function:start(NodeDef, self()),
+    gen_server:cast(Pid, {incoming, Message}),
+
+    receive
+        {error, Msg} ->
+            ?assertEqual(<<"signature mismatched">>, Msg)
+    after 5000 ->
+        ?assert(false)
+    end.
+
+missing_secret_test() ->
+    os:unsetenv("FUNCTION_NODE_SECRET"),
+    Code = <<"ok">>,
+    Secret = "a-real-secret",
+    Signature = crypto:mac(hmac, sha256, Secret, Code),
+    NodeDef = prepare(Code, Signature),
+
+    Message = build_payload(<<"Hello">>, ?WS_NAME),
+    {ok, Pid} = ered_node_function:start(NodeDef, self()),
+    gen_server:cast(Pid, {incoming, Message}),
+
+    receive
+        {error, Msg} ->
+            ?assertEqual(<<"no signature secret">>, Msg)
+    after 5000 ->
+        ?assert(false)
+    end.
+
+
+prepare(Code, Signature) ->
+    logger:set_primary_config(level, debug),
+    pg:start_link(),
+    ered_config_store:start(),
+    ered_msgtracer_manager:start_link(),
+    ered_erlmodule_exchange:start_link(),
+
+    FlowId = "flowId",
+    NodeId = "nodeId",
+    WsName = ?WS_NAME,
+
+    NodeDef = build_node_def(FlowId, NodeId, WsName, Code, Signature),
+    node_result_message_handler:start_link(NodeDef, self()),
+    NodeDef.
 
 
 build_payload(Content, WsName) ->

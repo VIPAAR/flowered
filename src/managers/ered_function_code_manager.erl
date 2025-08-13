@@ -196,8 +196,8 @@ perform_func_code(NodeDef, Msg, From) ->
                             is_process_alive(From) andalso
                                 gen_server:cast(From, {func_completed_with, Msg})
                     end;
-                {error, Reason} ->
-                    post_exception_or_debug(NodeDef, Msg, Reason)
+                Error ->
+                    post_exception_or_debug(NodeDef, Msg, Error)
             end;
         _ ->
             ?POST_MISSING_CODE(<<"function code not found">>)
@@ -215,10 +215,10 @@ verify_signature(NodeDef, Code) ->
                         Signature =:= ExpectedSignature ->
                             ok;
                         true ->
-                            {error, <<"signature_mismatch">>}
+                            <<"signature mismatched">>
                     end;
-                {error, Reason} ->
-                    {error, Reason}
+                {error, _Reason} ->
+                    <<"no signature secret">>
             end;
         _ ->
             ok
