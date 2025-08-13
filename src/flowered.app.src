@@ -5,6 +5,7 @@
     {applications, [
         kernel,
         stdlib,
+        crypto,
         cowboy,
         mapz,
         erlang_red_jsonata,
