@@ -55,7 +55,7 @@ missing_signature_setting_test() ->
 
     receive
         {error, Msg} ->
-            ?assertEqual(<<"signature missed">>, Msg)
+            ?assertEqual(<<"signature missing">>, Msg)
     after 5000 ->
         ?assert(false)
     end.

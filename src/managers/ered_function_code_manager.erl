@@ -221,7 +221,7 @@ verify_signature(NodeDef, Code) ->
                     <<"no signature secret">>
             end;
         _ ->
-            <<"signature missed">>
+            <<"signature missing">>
     end.
 
 %%
