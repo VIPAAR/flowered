@@ -208,28 +208,20 @@ perform_func_code(NodeDef, Msg, From) ->
 verify_signature(NodeDef, Code) ->
     case maps:find(<<"signature">>, NodeDef) of
         {ok, Signature} ->
-            case get_secret() of
+            case application:get_env(flowered, function_node_secret) of
                 {ok, Secret} ->
                     ExpectedSignature = crypto:mac(hmac, sha256, Secret, Code),
                     if
                         Signature =:= ExpectedSignature ->
                             ok;
                         true ->
-                            <<"signature mismatched">>
+                            <<"signature mismatch">>
                     end;
-                {error, _Reason} ->
+                _ ->
                     <<"no signature secret">>
             end;
         _ ->
             <<"signature missed">>
-    end.
-
-get_secret() ->
-    case os:getenv("FUNCTION_NODE_SECRET") of
-        Secret when is_list(Secret) ->
-            {ok, list_to_binary(Secret)};
-        false ->
-            {error, <<"no_secret">>}
     end.
 
 %%

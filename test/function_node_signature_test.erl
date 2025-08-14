@@ -3,13 +3,8 @@
 
 -define(WS_NAME, node_pid_function).
 
-with_valid_signature_test() ->
-    Code = <<"ok">>,
-    Secret = "a-real-secret",
-    os:putenv("FUNCTION_NODE_SECRET", Secret),
-    Signature = crypto:mac(hmac, sha256, Secret, Code),
-    NodeDef = prepare(Code, Signature),
-
+valid_signature_test() ->
+    NodeDef = setup(),
     Message = build_payload(<<"Hello">>, ?WS_NAME),
     {ok, Pid} = ered_node_function:start(NodeDef, self()),
     gen_server:cast(Pid, {incoming, Message}),
@@ -22,31 +17,23 @@ with_valid_signature_test() ->
     end.
 
 invalid_signature_test() ->
-    Secret = "a-real-secret",
-    os:putenv("FUNCTION_NODE_SECRET", Secret),
-
-    Code = <<"ok">>,
-    Signature = crypto:mac(hmac, sha256, Secret, Code),
-    NodeDef = prepare(<<"error">>, Signature),
-
+    NodeDef = setup(),
+    % change the function code after set the signature
+    NewNodeDef = maps:put(<<"func">>, <<"error">>, NodeDef),
     Message = build_payload(<<"Hello">>, ?WS_NAME),
-    {ok, Pid} = ered_node_function:start(NodeDef, self()),
+    {ok, Pid} = ered_node_function:start(NewNodeDef, self()),
     gen_server:cast(Pid, {incoming, Message}),
 
     receive
         {error, Msg} ->
-            ?assertEqual(<<"signature mismatched">>, Msg)
+            ?assertEqual(<<"signature mismatch">>, Msg)
     after 5000 ->
         ?assert(false)
     end.
 
 missing_secret_test() ->
-    os:unsetenv("FUNCTION_NODE_SECRET"),
-    Code = <<"ok">>,
-    Secret = "a-real-secret",
-    Signature = crypto:mac(hmac, sha256, Secret, Code),
-    NodeDef = prepare(Code, Signature),
-
+    NodeDef = setup(),
+    config_utils:remove_config(function_node_secret),
     Message = build_payload(<<"Hello">>, ?WS_NAME),
     {ok, Pid} = ered_node_function:start(NodeDef, self()),
     gen_server:cast(Pid, {incoming, Message}),
@@ -59,11 +46,7 @@ missing_secret_test() ->
     end.
 
 missing_signature_setting_test() ->
-    os:unsetenv("FUNCTION_NODE_SECRET"),
-    Code = <<"ok">>,
-    Secret = "a-real-secret",
-    Signature = crypto:mac(hmac, sha256, Secret, Code),
-    NodeDef = prepare(Code, Signature),
+    NodeDef = setup(),
     NewNodeDef = maps:remove(<<"signature">>, NodeDef),
 
     Message = build_payload(<<"Hello">>, ?WS_NAME),
@@ -77,13 +60,18 @@ missing_signature_setting_test() ->
         ?assert(false)
     end.
 
-prepare(Code, Signature) ->
-    logger:set_primary_config(level, debug),
+setup() ->
+    config_utils:load_config(),
     pg:start_link(),
     ered_config_store:start(),
     ered_msgtracer_manager:start_link(),
     ered_erlmodule_exchange:start_link(),
+    Code = <<"ok">>,
+    Secret = config_utils:get_config(function_node_secret),
+    Signature = crypto:mac(hmac, sha256, Secret, Code),
+    prepare(Code, Signature).
 
+prepare(Code, Signature) ->
     FlowId = "flowId",
     NodeId = "nodeId",
     WsName = ?WS_NAME,
