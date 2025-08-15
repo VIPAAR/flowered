@@ -1,3 +1,6 @@
+2025-08-15  Calix Hu <calix.hu@helplightning.com> - Merged by Marcus Dillavou  <marcus.dillavou@helplightning.com>
+        * FL-1 - Require a signature for Function nodes
+
 0.99.1
 ==========
 2025-07-09  Marcus Dillavou  <marcus.dillavou@helplightning.com>

@@ -173,28 +173,55 @@ perform_func_code(NodeDef, Msg, From) ->
         {ok, <<>>} ->
             ?POST_MISSING_CODE(<<"empty function code, doing nothing">>);
         {ok, Code} ->
-            NewMsg = execute_sync(
-                io_lib:format("fun(NodeDef,Msg) -> ~n ~s ~n end.", [Code]),
-                NodeDef,
-                Msg
-            ),
-
-            case
-                send_message_on_ports(maps:get(<<"wires">>, NodeDef), NewMsg)
-            of
-                unacceptable_response ->
-                    Msg2 = Msg#{failed_content => NewMsg},
-                    post_exception_or_debug(
+            case verify_signature(NodeDef, Code) of
+                ok ->
+                    NewMsg = execute_sync(
+                        io_lib:format("fun(NodeDef,Msg) -> ~n ~s ~n end.", [Code]),
                         NodeDef,
-                        Msg2,
-                        <<"unacceptable response">>
-                    );
-                _ ->
-                    is_process_alive(From) andalso
-                        gen_server:cast(From, {func_completed_with, Msg})
+                        Msg
+                    ),
+                    case
+                        send_message_on_ports(maps:get(<<"wires">>, NodeDef), NewMsg)
+                    of
+                        unacceptable_response ->
+                            logger:set_primary_config(level, debug),  % 设置日志级别
+                            logger:debug("unacceptable_response: ~p", [Msg]),
+                            Msg2 = Msg#{failed_content => NewMsg},
+                            post_exception_or_debug(
+                                NodeDef,
+                                Msg2,
+                                <<"unacceptable response">>
+                            );
+                        _ ->
+                            is_process_alive(From) andalso
+                                gen_server:cast(From, {func_completed_with, Msg})
+                    end;
+                Error ->
+                    post_exception_or_debug(NodeDef, Msg, Error)
             end;
         _ ->
             ?POST_MISSING_CODE(<<"function code not found">>)
+    end.
+
+%%
+%%
+verify_signature(NodeDef, Code) ->
+    case maps:find(<<"signature">>, NodeDef) of
+        {ok, Signature} ->
+            case application:get_env(flowered, function_node_secret) of
+                {ok, Secret} ->
+                    ExpectedSignature = crypto:mac(hmac, sha256, Secret, Code),
+                    if
+                        Signature =:= ExpectedSignature ->
+                            ok;
+                        true ->
+                            <<"signature mismatch">>
+                    end;
+                _ ->
+                    <<"no signature secret">>
+            end;
+        _ ->
+            <<"signature missing">>
     end.
 
 %%
