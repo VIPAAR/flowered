@@ -211,8 +211,9 @@ verify_signature(NodeDef, Code) ->
             case application:get_env(flowered, function_node_secret) of
                 {ok, Secret} ->
                     ExpectedSignature = crypto:mac(hmac, sha256, Secret, Code),
+                    Base64Signature = base64:encode(ExpectedSignature),
                     if
-                        Signature =:= ExpectedSignature ->
+                        Signature =:= Base64Signature ->
                             ok;
                         true ->
                             <<"signature mismatch">>
