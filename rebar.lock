@@ -4,7 +4,7 @@
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.13.0">>},1},
  {<<"erlang_red_jsonata">>,
   {git,"https://github.com/gorenje/erlang-red-jsonata",
-       {ref,"ce0c77dfed048460f279ea60d76fb8589cb360e1"}},
+       {ref,"7e044a09f4e757c07c5301341043a19659297c36"}},
   0},
  {<<"erlexec">>,{pkg,<<"erlexec">>,<<"2.2.0">>},0},
  {<<"erlydtl">>,{pkg,<<"erlydtl">>,<<"0.14.0">>},0},
